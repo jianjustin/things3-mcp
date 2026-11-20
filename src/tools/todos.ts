@@ -487,11 +487,11 @@ export class TodosTools extends BaseTool {
             },
             whenDate: {
               type: 'string',
-              description: 'When to work on it (ISO 8601)',
+              description: 'When to work on it: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday',
             },
             deadline: {
               type: 'string',
-              description: 'When it must be done (ISO 8601)',
+              description: 'When it must be done: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow',
             },
             tags: {
               type: 'array',
@@ -552,11 +552,11 @@ export class TodosTools extends BaseTool {
             },
             whenDate: {
               type: ['string', 'null'],
-              description: 'New when date (null to clear)',
+              description: 'New when date: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday. null to clear',
             },
             deadline: {
               type: ['string', 'null'],
-              description: 'New deadline (null to clear)',
+              description: 'New deadline: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow. null to clear',
             },
             tags: {
               type: 'array',

@@ -111,11 +111,11 @@ export class BulkTools extends BaseTool {
               },
               whenDate: {
                 type: ['string', 'null'],
-                description: 'The when date (ISO 8601 format) - null to clear'
+                description: 'The when date: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday. null to clear'
               },
               deadline: {
                 type: ['string', 'null'],
-                description: 'The deadline (ISO 8601 format) - null to clear'
+                description: 'The deadline: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow. null to clear'
               }
             },
             required: ['todoIds']

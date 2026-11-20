@@ -4,6 +4,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { createLogger } from './logger.js';
+import { toThingsDate, ThingsDateField } from './things-date.js';
 
 const execAsync = promisify(exec);
 
@@ -117,46 +118,14 @@ export class URLSchemeHandler {
   }
 
   /**
-   * Convert ISO date to Things3 format
+   * Convert a tool date input to a Things3 date value.
+   * Empty/undefined means "not provided"; invalid values throw (see toThingsDate).
    */
-  private formatDateForUrl(isoDate: string | null | undefined): string | undefined {
-    if (!isoDate) return undefined;
-    
-    try {
-      const date = new Date(isoDate);
-      if (isNaN(date.getTime())) return undefined;
-      
-      const today = new Date();
-      
-      // Check if it's today
-      if (this.isSameDay(date, today)) {
-        return 'today';
-      }
-      
-      // Check if it's tomorrow
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      if (this.isSameDay(date, tomorrow)) {
-        return 'tomorrow';
-      }
-      
-      // Return YYYY-MM-DD format
-      return date.toISOString().split('T')[0];
-    } catch (error) {
-      this.logger.warn('Failed to format date for URL', { date: isoDate, error });
-      return undefined;
-    }
+  private formatDateForUrl(value: string | null | undefined, field: ThingsDateField): string | undefined {
+    if (!value) return undefined;
+    return toThingsDate(value, field);
   }
 
-  /**
-   * Check if two dates are the same day
-   */
-  private isSameDay(date1: Date, date2: Date): boolean {
-    return date1.getFullYear() === date2.getFullYear() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getDate() === date2.getDate();
-  }
-  
   /**
    * Create a TODO using URL scheme
    */
@@ -175,8 +144,8 @@ export class URLSchemeHandler {
     const urlParams: Record<string, unknown> = {
       title: params.title,
       notes: params.notes,
-      when: this.formatDateForUrl(params.whenDate),
-      deadline: this.formatDateForUrl(params.deadline),
+      when: this.formatDateForUrl(params.whenDate, 'when'),
+      deadline: this.formatDateForUrl(params.deadline, 'deadline'),
       tags: params.tags?.join(','),
       'list-id': params.projectId || params.areaId,
       'heading': params.heading
@@ -207,8 +176,8 @@ export class URLSchemeHandler {
     const attributes: Things3AttributesWithAuth = {
       title: params.title,
       notes: params.notes,
-      when: params.whenDate === null ? '' : this.formatDateForUrl(params.whenDate),
-      deadline: params.deadline === null ? '' : this.formatDateForUrl(params.deadline),
+      when: params.whenDate === null ? '' : this.formatDateForUrl(params.whenDate, 'when'),
+      deadline: params.deadline === null ? '' : this.formatDateForUrl(params.deadline, 'deadline'),
       tags: params.tags,
       completed: params.completed,
       canceled: params.canceled,
@@ -333,8 +302,8 @@ export class URLSchemeHandler {
     const attributes: Things3AttributesWithAuth = {
       title: params.title,
       notes: params.notes,
-      when: this.formatDateForUrl(params.whenDate),
-      deadline: this.formatDateForUrl(params.deadline),
+      when: this.formatDateForUrl(params.whenDate, 'when'),
+      deadline: this.formatDateForUrl(params.deadline, 'deadline'),
       tags: params.tags,
       area: params.area,
       'area-id': params.areaId,
@@ -379,8 +348,8 @@ export class URLSchemeHandler {
     const attributes: Things3AttributesWithAuth = {
       title: params.title,
       notes: params.notes,
-      when: params.whenDate === null ? '' : this.formatDateForUrl(params.whenDate),
-      deadline: params.deadline === null ? '' : this.formatDateForUrl(params.deadline),
+      when: params.whenDate === null ? '' : this.formatDateForUrl(params.whenDate, 'when'),
+      deadline: params.deadline === null ? '' : this.formatDateForUrl(params.deadline, 'deadline'),
       tags: params.tags,
       completed: params.completed,
       canceled: params.canceled,
@@ -466,8 +435,8 @@ export class URLSchemeHandler {
     
     const todos = todoIds.map(id => {
       const attributes: Things3AttributesWithAuth = {
-        when: whenDate === null ? '' : this.formatDateForUrl(whenDate),
-        deadline: deadline === null ? '' : this.formatDateForUrl(deadline)
+        when: whenDate === null ? '' : this.formatDateForUrl(whenDate, 'when'),
+        deadline: deadline === null ? '' : this.formatDateForUrl(deadline, 'deadline')
       };
       if (authToken) {
         attributes['auth-token'] = authToken;

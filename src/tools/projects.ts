@@ -224,11 +224,11 @@ export class ProjectTools extends BaseTool {
             },
             whenDate: { 
               type: 'string',
-              description: 'When to start the project (ISO 8601 date)'
+              description: 'When to start the project: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday'
             },
             deadline: { 
               type: 'string',
-              description: 'Project deadline (ISO 8601 date)'
+              description: 'Project deadline: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow'
             },
             tags: { 
               type: 'array',
@@ -272,11 +272,11 @@ export class ProjectTools extends BaseTool {
               },
               whenDate: { 
                 type: ['string', 'null'],
-                description: 'New start date (ISO 8601, null to clear)'
+                description: 'New start date: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday. null to clear'
               },
               deadline: { 
                 type: ['string', 'null'],
-                description: 'New deadline (ISO 8601, null to clear)'
+                description: 'New deadline: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow. null to clear'
               },
               tags: { 
                 type: 'array',
