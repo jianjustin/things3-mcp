@@ -37,6 +37,40 @@ describe('Error Correction Functions', () => {
       expect(report.corrections).toHaveLength(0);
     });
 
+    it('does not swap when whenDate is a keyword such as tomorrow', () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const later = new Date(tomorrow);
+      later.setDate(later.getDate() + 7);
+      const iso = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+      const report = correctTodoCreateParams({ title: 'T', whenDate: 'tomorrow', deadline: iso(later) });
+
+      expect(report.hasCorrections).toBe(false);
+      expect(report.correctedData.whenDate).toBe('tomorrow');
+    });
+
+    it('does not swap someday/anytime, which have no calendar day', () => {
+      const report = correctTodoCreateParams({ title: 'T', whenDate: 'someday', deadline: '2020-01-01' });
+      expect(report.hasCorrections).toBe(false);
+    });
+
+    it('does not swap two times on the same calendar day', () => {
+      const report = correctTodoCreateParams({
+        title: 'T',
+        whenDate: '2026-12-01T18:00:00',
+        deadline: '2026-12-01T09:00:00',
+      });
+      expect(report.hasCorrections).toBe(false);
+    });
+
+    it('leaves invalid dates alone for validation to reject', () => {
+      const report = correctTodoCreateParams({ title: 'T', whenDate: 'soon-ish', deadline: '2026-12-01' });
+      expect(report.hasCorrections).toBe(false);
+      expect(report.correctedData.whenDate).toBe('soon-ish');
+    });
+
     it('should not correct when only one date is provided', () => {
       const params: TodosCreateParams = {
         title: 'Test TODO',

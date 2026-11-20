@@ -64,3 +64,38 @@ export function toThingsDate(value: string, field: ThingsDateField): string {
 
   throw invalid(value, field);
 }
+
+/**
+ * The calendar day (local YYYY-MM-DD) Things3 stores for a value returned by
+ * toThingsDate. null means "no date": anytime/someday, or a cleared date.
+ */
+export function resolveCalendarDay(thingsValue: string | null, today: Date = new Date()): string | null {
+  if (thingsValue === null) return null;
+  switch (thingsValue) {
+    case 'today':
+    case 'evening':
+      return localCalendarDate(today);
+    case 'tomorrow': {
+      const d = new Date(today);
+      d.setDate(d.getDate() + 1);
+      return localCalendarDate(d);
+    }
+    case 'anytime':
+    case 'someday':
+      return null;
+    default:
+      return thingsValue; // YYYY-MM-DD
+  }
+}
+
+/**
+ * Calendar day of a raw tool input, or null if it has none or is invalid
+ * (invalid values are rejected later by toThingsDate).
+ */
+export function calendarDayOfInput(value: string, field: ThingsDateField, today: Date = new Date()): string | null {
+  try {
+    return resolveCalendarDay(toThingsDate(value, field), today);
+  } catch {
+    return null;
+  }
+}

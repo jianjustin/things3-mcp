@@ -3,7 +3,7 @@
 
 import { ErrorType, Things3Error } from '../types/index.js';
 import * as templates from '../templates/applescript-templates.js';
-import { localCalendarDate } from './things-date.js';
+import { resolveCalendarDay } from './things-date.js';
 
 export type ItemKind = 'todo' | 'project';
 export type ItemStatus = 'open' | 'completed' | 'canceled';
@@ -65,29 +65,6 @@ const DEFAULT_OPTIONS: GuardOptions = {
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-/** The calendar day Things3 stores for a when/deadline value; null = no date */
-function expectedDay(value: string | null, today: Date): string | null {
-  if (value === null) return null;
-  switch (value) {
-    case 'today':
-    case 'evening':
-      return localCalendarDate(today);
-    case 'tomorrow':
-      return localCalendarDate(addDays(today, 1));
-    case 'anytime':
-    case 'someday':
-      return null;
-    default:
-      return value; // YYYY-MM-DD
-  }
-}
-
 /**
  * Translate requested changes into the state Things3 should end up in.
  */
@@ -96,8 +73,8 @@ export function expectationFor(changes: RequestedChanges, today: Date = new Date
   if (changes.title !== undefined) e.title = changes.title;
   if (changes.notes !== undefined) e.notes = changes.notes;
   if (changes.tags !== undefined) e.tags = changes.tags;
-  if (changes.whenDate !== undefined) e.activationDate = expectedDay(changes.whenDate, today);
-  if (changes.deadline !== undefined) e.deadline = expectedDay(changes.deadline, today);
+  if (changes.whenDate !== undefined) e.activationDate = resolveCalendarDay(changes.whenDate, today);
+  if (changes.deadline !== undefined) e.deadline = resolveCalendarDay(changes.deadline, today);
   if (changes.status !== undefined) e.status = changes.status;
   if (changes.list === 'inbox') {
     e.projectId = null;

@@ -9,6 +9,7 @@ import {
 import { TodosCreateParams, TodosUpdateParams } from '../types/tools.js';
 import { cleanTagName } from './tag-validator.js';
 import { createLogger } from './logger.js';
+import { calendarDayOfInput } from './things-date.js';
 
 const logger = createLogger('error-correction');
 
@@ -17,11 +18,12 @@ const logger = createLogger('error-correction');
  */
 function correctDateConflict(data: { whenDate?: string | null; deadline?: string | null }): CorrectionResult | null {
   if (!data.whenDate || !data.deadline) return null;
-  
-  const whenDate = new Date(data.whenDate);
-  const deadline = new Date(data.deadline);
-  
-  if (deadline >= whenDate) return null;
+
+  // Compare calendar days, not timestamps: keywords (tomorrow, someday...) are
+  // not parseable by Date, and two times on the same day are not a conflict.
+  const whenDay = calendarDayOfInput(data.whenDate, 'when');
+  const deadlineDay = calendarDayOfInput(data.deadline, 'deadline');
+  if (!whenDay || !deadlineDay || deadlineDay >= whenDay) return null;
 
   const originalWhenDate = data.whenDate;
   const originalDeadline = data.deadline;
