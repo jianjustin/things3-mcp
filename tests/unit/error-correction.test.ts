@@ -1,7 +1,7 @@
 // ABOUTME: Unit tests for the error correction system that validates automatic fixing of common Things3 issues
 // ABOUTME: Tests date conflicts, missing titles, invalid references, and tag cleaning
 
-import { correctTodoCreateParams, correctTodoUpdateParams, setValidProjectIds, setValidAreaIds, logCorrections } from '../../src/utils/error-correction';
+import { correctTodoCreateParams, correctTodoUpdateParams, logCorrections } from '../../src/utils/error-correction';
 import { TodosCreateParams, TodosUpdateParams } from '../../src/types/tools';
 import { CorrectionType } from '../../src/types/corrections';
 
@@ -88,67 +88,29 @@ describe('Error Correction Functions', () => {
     });
   });
 
-  describe('Invalid Project Reference Correction', () => {
-    beforeEach(() => {
-      // Set valid project IDs
-      setValidProjectIds(['project-1', 'project-2']);
-    });
-
-    it('should remove invalid project reference', () => {
-      const params: TodosCreateParams = {
-        title: 'Test TODO',
-        projectId: 'invalid-project',
-      };
-
-      const report = correctTodoCreateParams(params);
-
-      expect(report.hasCorrections).toBe(true);
-      expect(report.corrections[0]?.type).toBe(CorrectionType.INVALID_PROJECT_REFERENCE);
-      expect(report.correctedData.projectId).toBeNull();
-    });
-
-    it('should keep valid project reference', () => {
-      const params: TodosCreateParams = {
-        title: 'Test TODO',
-        projectId: 'project-1',
-      };
-
-      const report = correctTodoCreateParams(params);
+  describe('Project and Area References', () => {
+    // References are never rewritten by auto-correction: silently dropping an
+    // ID would put the item in the wrong list. Existence is checked against
+    // Things3 at write time instead.
+    it('leaves projectId untouched on create', () => {
+      const report = correctTodoCreateParams({ title: 'Test TODO', projectId: 'any-project' });
 
       expect(report.hasCorrections).toBe(false);
-      expect(report.correctedData.projectId).toBe('project-1');
-    });
-  });
-
-  describe('Invalid Area Reference Correction', () => {
-    beforeEach(() => {
-      // Set valid area IDs
-      setValidAreaIds(['area-1', 'area-2']);
+      expect(report.correctedData.projectId).toBe('any-project');
     });
 
-    it('should remove invalid area reference', () => {
-      const params: TodosCreateParams = {
-        title: 'Test TODO',
-        areaId: 'invalid-area',
-      };
-
-      const report = correctTodoCreateParams(params);
-
-      expect(report.hasCorrections).toBe(true);
-      expect(report.corrections[0]?.type).toBe(CorrectionType.INVALID_AREA_REFERENCE);
-      expect(report.correctedData.areaId).toBeNull();
-    });
-
-    it('should keep valid area reference', () => {
-      const params: TodosCreateParams = {
-        title: 'Test TODO',
-        areaId: 'area-1',
-      };
-
-      const report = correctTodoCreateParams(params);
+    it('leaves areaId untouched on create', () => {
+      const report = correctTodoCreateParams({ title: 'Test TODO', areaId: 'REAL-AREA-ID' });
 
       expect(report.hasCorrections).toBe(false);
-      expect(report.correctedData.areaId).toBe('area-1');
+      expect(report.correctedData.areaId).toBe('REAL-AREA-ID');
+    });
+
+    it('leaves areaId untouched on update', () => {
+      const report = correctTodoUpdateParams({ id: 'todo-1', areaId: 'REAL-AREA-ID' });
+
+      expect(report.hasCorrections).toBe(false);
+      expect(report.correctedData.areaId).toBe('REAL-AREA-ID');
     });
   });
 
@@ -192,8 +154,6 @@ describe('Error Correction Functions', () => {
 
   describe('Multiple Corrections', () => {
     it('should apply multiple corrections in one operation', () => {
-      setValidProjectIds(['project-1']);
-
       const params: TodosCreateParams = {
         title: '',
         notes: 'Important task description',
@@ -206,13 +166,13 @@ describe('Error Correction Functions', () => {
       const report = correctTodoCreateParams(params);
 
       expect(report.hasCorrections).toBe(true);
-      expect(report.corrections).toHaveLength(4);
+      expect(report.corrections).toHaveLength(3);
       
       // Check all corrections were applied
       expect(report.correctedData.title).toBe('Important task description');
       expect(report.correctedData.whenDate).toBe('2025-01-10T10:00:00Z');
       expect(report.correctedData.deadline).toBe('2025-01-15T10:00:00Z');
-      expect(report.correctedData.projectId).toBeNull();
+      expect(report.correctedData.projectId).toBe('invalid-project');
       expect(report.correctedData.tags).toEqual(['tag1', 'tag2']);
     });
   });

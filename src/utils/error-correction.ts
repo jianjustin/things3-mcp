@@ -1,4 +1,4 @@
-// ABOUTME: Error correction system that automatically fixes common Things3 issues like date conflicts and invalid references
+// ABOUTME: Error correction system that automatically fixes common Things3 issues like date conflicts and tag names
 // ABOUTME: Provides self-correcting behavior to improve user experience and prevent errors
 
 import {
@@ -9,60 +9,8 @@ import {
 import { TodosCreateParams, TodosUpdateParams } from '../types/tools.js';
 import { cleanTagName } from './tag-validator.js';
 import { createLogger } from './logger.js';
-import type { AppleScriptBridge } from './applescript.js';
 
 const logger = createLogger('error-correction');
-
-// Cache for valid IDs
-let validProjectIds: Set<string> = new Set();
-let validAreaIds: Set<string> = new Set();
-
-/**
- * Update valid project IDs for reference validation
- */
-export function setValidProjectIds(ids: string[]): void {
-  validProjectIds = new Set(ids);
-}
-
-/**
- * Update valid area IDs for reference validation
- */
-export function setValidAreaIds(ids: string[]): void {
-  validAreaIds = new Set(ids);
-}
-
-/**
- * Refresh valid project and area IDs by fetching current data
- */
-export async function refreshValidIds(bridge?: AppleScriptBridge): Promise<void> {
-  try {
-    // Use provided bridge or import and create new one
-    let scriptBridge = bridge;
-    if (!scriptBridge) {
-      const { AppleScriptBridge } = await import('../utils/applescript.js');
-      scriptBridge = new AppleScriptBridge();
-    }
-    
-    const templates = await import('../templates/applescript-templates.js');
-    
-    // Get current projects
-    const projectScript = templates.listProjects();
-    const projectResponse = await scriptBridge.execute(projectScript);
-    const projects = JSON.parse(projectResponse);
-    const projectIds = projects.map((p: { id: string }) => p.id);
-    setValidProjectIds(projectIds);
-    
-    // Get current areas
-    const areaScript = templates.listAreas();
-    const areaResponse = await scriptBridge.execute(areaScript);
-    const areas = JSON.parse(areaResponse);
-    const areaIds = areas.map((a: { id: string }) => a.id);
-    setValidAreaIds(areaIds);
-    
-  } catch (error) {
-    logger.warn('Failed to refresh valid IDs:', { error: error instanceof Error ? error.message : String(error) });
-  }
-}
 
 /**
  * Correct date conflicts where deadline is before when date
@@ -127,50 +75,6 @@ function correctMissingTitle(data: { title?: string; notes?: string | null }): C
 }
 
 /**
- * Handle invalid project references
- */
-function correctInvalidProjectReference(data: { projectId?: string | null }): CorrectionResult | null {
-  if (!data.projectId) return null;
-  // Temporarily disable project validation if no valid IDs are cached
-  if (validProjectIds.size === 0) return null;
-  if (validProjectIds.has(data.projectId)) return null;
-
-  const originalProjectId = data.projectId;
-  
-  // Move to inbox by removing project reference
-  data.projectId = null;
-
-  return {
-    type: CorrectionType.INVALID_PROJECT_REFERENCE,
-    field: 'projectId',
-    originalValue: originalProjectId,
-    correctedValue: null,
-    reason: 'Invalid project ID - item will be created in Inbox',
-  };
-}
-
-/**
- * Handle invalid area references
- */
-function correctInvalidAreaReference(data: { areaId?: string | null }): CorrectionResult | null {
-  if (!data.areaId) return null;
-  if (validAreaIds.has(data.areaId)) return null;
-
-  const originalAreaId = data.areaId;
-  
-  // Remove invalid area reference
-  data.areaId = null;
-
-  return {
-    type: CorrectionType.INVALID_AREA_REFERENCE,
-    field: 'areaId',
-    originalValue: originalAreaId,
-    correctedValue: null,
-    reason: 'Invalid area ID - reference removed',
-  };
-}
-
-/**
  * Clean invalid characters from tag names
  */
 function correctTagNames(data: { tags?: string[] }): CorrectionResult | null {
@@ -208,12 +112,6 @@ export function correctTodoCreateParams(params: TodosCreateParams): CorrectionRe
   const dateCorrection = correctDateConflict(correctedData);
   if (dateCorrection) corrections.push(dateCorrection);
 
-  const projectCorrection = correctInvalidProjectReference(correctedData);
-  if (projectCorrection) corrections.push(projectCorrection);
-
-  const areaCorrection = correctInvalidAreaReference(correctedData);
-  if (areaCorrection) corrections.push(areaCorrection);
-
   const tagCorrection = correctTagNames(correctedData);
   if (tagCorrection) corrections.push(tagCorrection);
 
@@ -234,12 +132,6 @@ export function correctTodoUpdateParams(params: TodosUpdateParams): CorrectionRe
   // For updates, we don't correct missing title (it's optional)
   const dateCorrection = correctDateConflict(correctedData);
   if (dateCorrection) corrections.push(dateCorrection);
-
-  const projectCorrection = correctInvalidProjectReference(correctedData);
-  if (projectCorrection) corrections.push(projectCorrection);
-
-  const areaCorrection = correctInvalidAreaReference(correctedData);
-  if (areaCorrection) corrections.push(areaCorrection);
 
   const tagCorrection = correctTagNames(correctedData);
   if (tagCorrection) corrections.push(tagCorrection);

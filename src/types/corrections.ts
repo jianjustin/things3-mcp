@@ -7,8 +7,6 @@
 export enum CorrectionType {
   DATE_CONFLICT = 'date_conflict',
   MISSING_TITLE = 'missing_title',
-  INVALID_PROJECT_REFERENCE = 'invalid_project_reference',
-  INVALID_AREA_REFERENCE = 'invalid_area_reference',
   INVALID_TAG_NAME = 'invalid_tag_name',
 }
 
