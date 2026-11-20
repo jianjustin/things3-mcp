@@ -1,7 +1,10 @@
 // ABOUTME: Area management tools for Things3 integration
 // ABOUTME: Provides list and create operations for areas
 
-import { BaseTool, ToolRegistration } from '../base/tool-base.js';
+import * as z from 'zod';
+import { BaseTool, ToolDefinition } from '../base/tool-base.js';
+import { READ_ONLY, CREATES, DESTRUCTIVE } from '../base/annotations.js';
+import { idList } from '../base/schemas.js';
 import { 
   AreasCreateParams,
   AreasCreateResult,
@@ -67,67 +70,37 @@ export class AreaTools extends BaseTool {
     }
   }
 
-  /**
-   * Get tool registrations for the registry
-   */
-  getToolRegistrations(): ToolRegistration[] {
+  getToolDefinitions(): ToolDefinition[] {
     return [
       {
         name: 'areas_list',
+        title: 'List areas',
+        description: 'List all areas in Things3',
+        inputSchema: z.object({
+          includeHidden: z.boolean().optional().describe('Include hidden areas (not supported yet; ignored)'),
+        }),
+        annotations: READ_ONLY,
         handler: this.listAreas.bind(this),
-        toolDefinition: {
-          name: 'areas_list',
-          description: 'List all areas in Things3',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              includeHidden: { 
-                type: 'boolean',
-                description: 'Include hidden areas in the list'
-              }
-            }
-          }
-        }
       },
       {
         name: 'areas_create',
+        title: 'Create area',
+        description: 'Create a new area in Things3',
+        inputSchema: z.object({
+          name: z.string().min(1).describe('The name of the area to create'),
+        }),
+        annotations: CREATES,
         handler: this.createArea.bind(this),
-        toolDefinition: {
-          name: 'areas_create',
-          description: 'Create a new area in Things3',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              name: { 
-                type: 'string',
-                description: 'The name of the area to create'
-              }
-            },
-            required: ['name']
-          }
-        }
       },
       {
         name: 'areas_delete',
+        title: 'Delete areas',
+        description: 'Delete areas in Things3',
+        inputSchema: z.object({ ids: idList('Area ID(s) to delete') }),
+        annotations: DESTRUCTIVE,
         handler: this.deleteAreas.bind(this),
-        toolDefinition: {
-          name: 'areas_delete',
-          description: 'Delete areas in Things3 (moves to trash)',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              ids: {
-                oneOf: [
-                  { type: 'string' },
-                  { type: 'array', items: { type: 'string' } }
-                ],
-                description: 'Area ID or array of area IDs to delete'
-              }
-            },
-            required: ['ids']
-          }
-        }
-      }
+      },
     ];
   }
+
 }

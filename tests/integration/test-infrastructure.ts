@@ -1,7 +1,7 @@
 // ABOUTME: Shared test infrastructure for Things3 MCP integration tests
 // ABOUTME: Provides reusable setup/teardown, timing utilities, and enhanced resource tracking
 
-import { Things3Server } from '../../src/server';
+import { ToolSet } from './tool-set.js';
 import { AppleScriptBridge } from '../../src/utils/applescript';
 
 export interface TestTimer {
@@ -13,7 +13,7 @@ export interface TestTimer {
 }
 
 export interface TestEnvironment {
-  server: Things3Server;
+  server: ToolSet;
   bridge: AppleScriptBridge;
   tracker: EnhancedTestResourceTracker;
 }
@@ -33,10 +33,10 @@ export class EnhancedTestResourceTracker {
   private areas = new Set<string>();
   private tags = new Set<string>();
   private testTimers = new Map<string, TestTimer>();
-  private server: Things3Server;
+  private server: ToolSet;
   private environmentStartTime: number;
 
-  constructor(server: Things3Server) {
+  constructor(server: ToolSet) {
     this.server = server;
     this.environmentStartTime = Date.now();
   }
@@ -219,7 +219,7 @@ export class EnhancedTestResourceTracker {
 export async function setupTestEnvironment(): Promise<TestEnvironment> {
   console.log('\n🔧 Setting up test environment...');
   
-  const server = new Things3Server();
+  const server = new ToolSet();
   const bridge = new AppleScriptBridge();
   const tracker = new EnhancedTestResourceTracker(server);
 

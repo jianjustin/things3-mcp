@@ -1,7 +1,9 @@
 // ABOUTME: System utility tools for Things3 MCP server
 // ABOUTME: Provides Things3 launch functionality
 
-import { BaseTool, ToolRegistration } from '../base/tool-base.js';
+import * as z from 'zod';
+import { BaseTool, ToolDefinition } from '../base/tool-base.js';
+import { ADDITIVE } from '../base/annotations.js';
 import * as templates from '../templates/applescript-templates.js';
 
 export class SystemTools extends BaseTool {
@@ -35,23 +37,17 @@ export class SystemTools extends BaseTool {
     }
   }
 
-  /**
-   * Get tool registrations for the registry
-   */
-  getToolRegistrations(): ToolRegistration[] {
+  getToolDefinitions(): ToolDefinition[] {
     return [
       {
         name: 'system_launch',
+        title: 'Launch Things3',
+        description: 'Launch the Things3 app if it is not running',
+        inputSchema: z.object({}),
+        annotations: ADDITIVE,
         handler: this.launch.bind(this),
-        toolDefinition: {
-          name: 'system_launch',
-          description: 'Launch Things3 application if not already running',
-          inputSchema: {
-            type: 'object',
-            properties: {}
-          }
-        }
-      }
+      },
     ];
   }
+
 }

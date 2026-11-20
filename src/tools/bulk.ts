@@ -1,7 +1,10 @@
 // ABOUTME: Bulk operation tools for Things3 TODOs
 // ABOUTME: Provides bulk move and bulk date update operations
 
-import { BaseTool, ToolRegistration } from '../base/tool-base.js';
+import * as z from 'zod';
+import { BaseTool, ToolDefinition } from '../base/tool-base.js';
+import { DESTRUCTIVE } from '../base/annotations.js';
+import { idList, WHEN_FORMATS, DEADLINE_FORMATS } from '../base/schemas.js';
 import { BulkMoveParams, BulkUpdateDatesParams } from '../types/tools.js';
 import { urlSchemeHandler } from '../utils/url-scheme.js';
 import { ErrorType, Things3Error } from '../types/index.js';
@@ -68,83 +71,33 @@ export class BulkTools extends BaseTool {
     return { updated: verification.applied.length };
   }
 
-  /**
-   * Get tool registrations for the registry
-   */
-  getToolRegistrations(): ToolRegistration[] {
+  getToolDefinitions(): ToolDefinition[] {
     return [
       {
         name: 'bulk_move',
+        title: 'Move to-dos',
+        description: 'Move to-dos to a project or area, or to the Inbox when neither is given',
+        inputSchema: z.object({
+          todoIds: idList('To-do ID(s) to move'),
+          projectId: z.string().nullable().optional().describe('Project to move the to-dos to'),
+          areaId: z.string().nullable().optional().describe('Area to move the to-dos to (not together with projectId)'),
+        }),
+        annotations: DESTRUCTIVE,
         handler: this.move.bind(this),
-        toolDefinition: {
-          name: 'bulk_move',
-          description: 'Move multiple TODOs to a project or area',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              todoIds: {
-                oneOf: [
-                  {
-                    type: 'string',
-                    description: 'Single TODO ID'
-                  },
-                  {
-                    type: 'array',
-                    items: { type: 'string' },
-                    description: 'Array of TODO IDs'
-                  }
-                ],
-                description: 'TODO ID(s) to move'
-              },
-              projectId: {
-                type: 'string',
-                description: 'The ID of the project to move the TODOs to'
-              },
-              areaId: {
-                type: 'string',
-                description: 'The ID of the area to move the TODOs to'
-              }
-            },
-            required: ['todoIds']
-          }
-        }
       },
       {
         name: 'bulk_updateDates',
+        title: 'Set dates on to-dos',
+        description: 'Set or clear the when date and/or deadline of several to-dos at once',
+        inputSchema: z.object({
+          todoIds: idList('To-do ID(s) to update'),
+          whenDate: z.string().nullable().optional().describe(`The when date: ${WHEN_FORMATS}. null to clear`),
+          deadline: z.string().nullable().optional().describe(`The deadline: ${DEADLINE_FORMATS}. null to clear`),
+        }),
+        annotations: DESTRUCTIVE,
         handler: this.updateDates.bind(this),
-        toolDefinition: {
-          name: 'bulk_updateDates',
-          description: 'Update dates for multiple TODOs at once',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              todoIds: {
-                oneOf: [
-                  {
-                    type: 'string',
-                    description: 'Single TODO ID'
-                  },
-                  {
-                    type: 'array',
-                    items: { type: 'string' },
-                    description: 'Array of TODO IDs'
-                  }
-                ],
-                description: 'TODO ID(s) to update'
-              },
-              whenDate: {
-                type: ['string', 'null'],
-                description: 'The when date: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday. null to clear'
-              },
-              deadline: {
-                type: ['string', 'null'],
-                description: 'The deadline: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow. null to clear'
-              }
-            },
-            required: ['todoIds']
-          }
-        }
-      }
+      },
     ];
   }
+
 }

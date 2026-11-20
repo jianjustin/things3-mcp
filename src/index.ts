@@ -1,37 +1,22 @@
 #!/usr/bin/env node
 
 // ABOUTME: Entry point for the Things3 MCP server
-// ABOUTME: Initializes and starts the MCP server for Things3 integration
+// ABOUTME: Serves MCP over stdio (both 2025-era and 2026-era clients) until stdin closes or a signal arrives
 
-import { Things3Server } from './server.js';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
+import { createServer } from './server.js';
 import { createLogger } from './utils/logger.js';
 
 const logger = createLogger('things3');
 
-async function main(): Promise<void> {
-  try {
-    logger.info('Initializing server...');
-    const server = new Things3Server();
-    await server.start();
-    
-    logger.info('Server started and connected successfully');
-    
-    // Handle graceful shutdown
-    process.on('SIGINT', async () => {
-      logger.info('Received SIGINT, shutting down...');
-      await server.stop();
-      process.exit(0);
-    });
-    
-    process.on('SIGTERM', async () => {
-      logger.info('Received SIGTERM, shutting down...');
-      await server.stop();
-      process.exit(0);
-    });
-  } catch (error) {
-    logger.error('Failed to start Things3 MCP Server:', error as Error);
-    process.exit(1);
-  }
-}
+const handle = serveStdio(() => createServer(), {
+  onerror: (error) => logger.error('MCP transport error', error),
+});
+logger.info('Things3 MCP server listening on stdio');
 
-main().catch(err => logger.error('Unhandled error:', err));
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    logger.info(`Received ${signal}, shutting down...`);
+    void handle.close().finally(() => process.exit(0));
+  });
+}

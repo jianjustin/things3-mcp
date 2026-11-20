@@ -20,7 +20,7 @@ An MCP (Model Context Protocol) server that provides comprehensive integration w
 ## Requirements
 
 - **macOS** (Things3 is macOS-only)
-- **Node.js** >= 16.0.0
+- **Node.js** >= 20.0.0
 - **Things3** app installed
 - **AppleScript** access enabled in System Settings
 

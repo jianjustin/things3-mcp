@@ -1,7 +1,10 @@
 // ABOUTME: Project management tools for Things3 integration
 // ABOUTME: Provides list, get, create, update, and complete operations
 
-import { BaseTool, ToolRegistration } from '../base/tool-base.js';
+import * as z from 'zod';
+import { BaseTool, ToolDefinition } from '../base/tool-base.js';
+import { READ_ONLY, CREATES, ADDITIVE, DESTRUCTIVE } from '../base/annotations.js';
+import { idList, WHEN_FORMATS, DEADLINE_FORMATS } from '../base/schemas.js';
 import { 
   ProjectsListParams, 
   ProjectsGetParams,
@@ -190,176 +193,81 @@ export class ProjectTools extends BaseTool {
     return { success: true, deletedCount };
   }
 
-  /**
-   * Get tool registrations for the registry
-   */
-  getToolRegistrations(): ToolRegistration[] {
+  getToolDefinitions(): ToolDefinition[] {
     return [
       {
         name: 'projects_list',
+        title: 'List projects',
+        description: 'List projects in Things3',
+        inputSchema: z.object({
+          areaId: z.string().optional().describe('Only projects in this area'),
+          includeCompleted: z.boolean().optional().describe('Include completed projects'),
+        }),
+        annotations: READ_ONLY,
         handler: this.listProjects.bind(this),
-        toolDefinition: {
-          name: 'projects_list',
-          description: 'List all projects in Things3',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              areaId: { 
-                type: 'string',
-                description: 'Filter projects by area ID'
-              },
-              includeCompleted: { 
-                type: 'boolean',
-                description: 'Include completed projects in the list'
-              }
-            }
-          }
-        }
       },
       {
         name: 'projects_get',
+        title: 'Get project',
+        description: 'Get detailed information about a specific project',
+        inputSchema: z.object({
+          id: z.string().min(1).describe('The project ID'),
+        }),
+        annotations: READ_ONLY,
         handler: this.getProject.bind(this),
-        toolDefinition: {
-          name: 'projects_get',
-          description: 'Get detailed information about a specific project',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              id: { 
-                type: 'string',
-                description: 'The project ID'
-              }
-            },
-            required: ['id']
-          }
-        }
       },
       {
         name: 'projects_create',
+        title: 'Create project',
+        description:
+          'Create a new project and return its id. Fields Things3 did not apply (e.g. unknown tags) are returned as warnings.',
+        inputSchema: z.object({
+          name: z.string().describe('The project name'),
+          notes: z.string().optional().describe('Notes for the project'),
+          whenDate: z.string().optional().describe(`When to start the project: ${WHEN_FORMATS}`),
+          deadline: z.string().optional().describe(`Project deadline: ${DEADLINE_FORMATS}`),
+          tags: z.array(z.string()).optional().describe('Tags to assign (must already exist)'),
+          areaId: z.string().optional().describe('Area to put the project in'),
+          headings: z.array(z.string()).optional().describe('Section headings to create within the project'),
+        }),
+        annotations: CREATES,
         handler: this.createProject.bind(this),
-        toolDefinition: {
-          name: 'projects_create',
-          description: 'Create a new project in Things3',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              name: { 
-                type: 'string',
-                description: 'The project name'
-              },
-              notes: { 
-                type: 'string',
-              description: 'Optional notes for the project'
-            },
-            whenDate: { 
-              type: 'string',
-              description: 'When to start the project: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday'
-            },
-            deadline: { 
-              type: 'string',
-              description: 'Project deadline: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow'
-            },
-            tags: { 
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Tags to assign to the project'
-            },
-            areaId: { 
-              type: 'string',
-              description: 'Area to assign the project to'
-            },
-            headings: { 
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Section headings to create within the project'
-            }
-          },
-          required: ['name']
-          }
-        }
       },
       {
         name: 'projects_update',
+        title: 'Update project',
+        description: 'Change fields of an existing project; fails unless Things3 really applied the change',
+        inputSchema: z.object({
+          id: z.string().min(1).describe('The project ID to update'),
+          name: z.string().optional().describe('New project name'),
+          notes: z.string().nullable().optional().describe('New notes (null to clear)'),
+          whenDate: z.string().nullable().optional().describe(`New start date: ${WHEN_FORMATS}. null to clear`),
+          deadline: z.string().nullable().optional().describe(`New deadline: ${DEADLINE_FORMATS}. null to clear`),
+          tags: z.array(z.string()).optional().describe('Replace all tags (tags must already exist)'),
+          areaId: z.string().nullable().optional().describe('Move to this area (null to remove from its area)'),
+        }),
+        annotations: DESTRUCTIVE,
         handler: this.updateProject.bind(this),
-        toolDefinition: {
-          name: 'projects_update',
-          description: 'Update an existing project',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              id: { 
-                type: 'string',
-                description: 'The project ID to update'
-              },
-              name: { 
-                type: 'string',
-                description: 'New project name'
-              },
-              notes: { 
-                type: ['string', 'null'],
-                description: 'New notes (null to clear)'
-              },
-              whenDate: { 
-                type: ['string', 'null'],
-                description: 'New start date: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday. null to clear'
-              },
-              deadline: { 
-                type: ['string', 'null'],
-                description: 'New deadline: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow. null to clear'
-              },
-              tags: { 
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Replace all tags with these tags'
-              },
-              areaId: { 
-                type: ['string', 'null'],
-                description: 'Move to new area (null to remove from area)'
-              }
-            },
-            required: ['id']
-          }
-        }
       },
       {
         name: 'projects_complete',
+        title: 'Complete project',
+        description: 'Mark a project as completed. Things3 also marks all of its open to-dos as completed.',
+        inputSchema: z.object({
+          id: z.string().min(1).describe('The project ID to complete'),
+        }),
+        annotations: ADDITIVE,
         handler: this.completeProject.bind(this),
-        toolDefinition: {
-          name: 'projects_complete',
-          description: 'Mark a project as completed. Things3 also marks all of its open to-dos as completed.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              id: { 
-                type: 'string',
-                description: 'The project ID to complete'
-              }
-            },
-            required: ['id']
-          }
-        }
       },
       {
         name: 'projects_delete',
+        title: 'Move projects to Trash',
+        description: 'Move projects and their to-dos to the Trash (recoverable in Things3)',
+        inputSchema: z.object({ ids: idList('Project ID(s) to delete') }),
+        annotations: DESTRUCTIVE,
         handler: this.deleteProjects.bind(this),
-        toolDefinition: {
-          name: 'projects_delete',
-          description: 'Move projects and their to-dos to the Trash (recoverable in Things3)',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              ids: {
-                oneOf: [
-                  { type: 'string' },
-                  { type: 'array', items: { type: 'string' } }
-                ],
-                description: 'Project ID or array of project IDs to delete'
-              }
-            },
-            required: ['ids']
-          }
-        }
-      }
+      },
     ];
   }
+
 }

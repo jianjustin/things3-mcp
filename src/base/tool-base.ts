@@ -1,7 +1,8 @@
 // ABOUTME: Base class for all tools providing common functionality and registration
 // ABOUTME: Eliminates code duplication across tool implementations
 
-import { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/server';
+import type * as z from 'zod';
 import { AppleScriptBridge } from '../utils/applescript.js';
 import { createLogger } from '../utils/logger.js';
 import { WriteGuard } from '../utils/write-guard.js';
@@ -13,12 +14,17 @@ import { WriteGuard } from '../utils/write-guard.js';
 export type ToolHandler = (args: any) => Promise<any>;
 
 /**
- * Tool registration info
+ * Everything needed to register one MCP tool
  */
-export interface ToolRegistration {
+export interface ToolDefinition {
   name: string;
+  /** Human-readable display name */
+  title: string;
+  description: string;
+  /** Validated by the SDK before the handler runs; published to clients as JSON Schema */
+  inputSchema: z.ZodObject<z.ZodRawShape>;
+  annotations: ToolAnnotations;
   handler: ToolHandler;
-  toolDefinition: Tool;
 }
 
 /**
@@ -57,8 +63,7 @@ export abstract class BaseTool {
   }
 
   /**
-   * Get all tool registrations for this tool class
-   * Must be implemented by each tool class
+   * The MCP tools this class provides
    */
-  abstract getToolRegistrations(): ToolRegistration[];
+  abstract getToolDefinitions(): ToolDefinition[];
 }

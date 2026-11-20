@@ -1,7 +1,7 @@
 // ABOUTME: Test helper utilities for integration tests
 // ABOUTME: Provides resource tracking and cleanup functionality for Things3 tests
 
-import { Things3Server } from '../../src/server.js';
+import { ToolSet } from './tool-set.js';
 
 /**
  * Test resource tracker for cleanup
@@ -11,9 +11,9 @@ export class TestResourceTracker {
   private projectIds: Set<string> = new Set();
   private areaNames: Set<string> = new Set();
   private tagNames: Set<string> = new Set();
-  private server: Things3Server;
+  private server: ToolSet;
 
-  constructor(server: Things3Server) {
+  constructor(server: ToolSet) {
     this.server = server;
   }
 

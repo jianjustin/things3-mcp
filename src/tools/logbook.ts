@@ -1,7 +1,9 @@
 // ABOUTME: Logbook search tool for Things3 completed items
 // ABOUTME: Provides searching through completed tasks with date range filtering
 
-import { BaseTool, ToolRegistration } from '../base/tool-base.js';
+import * as z from 'zod';
+import { BaseTool, ToolDefinition } from '../base/tool-base.js';
+import { READ_ONLY } from '../base/annotations.js';
 import * as templates from '../templates/applescript-templates.js';
 import { LogbookSearchParams } from '../types/tools.js';
 import { TodoItem } from '../types/models.js';
@@ -57,42 +59,22 @@ export class LogbookTools extends BaseTool {
     }
   }
 
-  /**
-   * Get tool registrations for the registry
-   */
-  getToolRegistrations(): ToolRegistration[] {
+  getToolDefinitions(): ToolDefinition[] {
     return [
       {
         name: 'logbook_search',
+        title: 'Search logbook',
+        description: 'Search completed items in the logbook',
+        inputSchema: z.object({
+          searchText: z.string().optional().describe('Text to search for in title or notes'),
+          fromDate: z.string().optional().describe('Start of completion date range (ISO 8601)'),
+          toDate: z.string().optional().describe('End of completion date range (ISO 8601)'),
+          limit: z.number().int().min(1).max(1000).optional().describe('Maximum number of results (default 100)'),
+        }),
+        annotations: READ_ONLY,
         handler: this.search.bind(this),
-        toolDefinition: {
-          name: 'logbook_search',
-          description: 'Search completed items in the logbook with optional filters',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              searchText: {
-                type: 'string',
-                description: 'Text to search for in title or notes'
-              },
-              fromDate: {
-                type: 'string',
-                description: 'Start date for completion date filter (ISO 8601 format)'
-              },
-              toDate: {
-                type: 'string',
-                description: 'End date for completion date filter (ISO 8601 format)'
-              },
-              limit: {
-                type: 'number',
-                description: 'Maximum number of results to return (default: 100)',
-                minimum: 1,
-                maximum: 1000
-              }
-            }
-          }
-        }
-      }
+      },
     ];
   }
+
 }

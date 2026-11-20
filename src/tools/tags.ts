@@ -1,7 +1,10 @@
 // ABOUTME: Tag management tools for Things3 integration
 // ABOUTME: Provides list, create, add, and remove operations with hierarchy support
 
-import { BaseTool, ToolRegistration } from '../base/tool-base.js';
+import * as z from 'zod';
+import { BaseTool, ToolDefinition } from '../base/tool-base.js';
+import { READ_ONLY, CREATES, ADDITIVE, DESTRUCTIVE } from '../base/annotations.js';
+import { idList } from '../base/schemas.js';
 import { 
   TagsCreateParams,
   TagsCreateResult,
@@ -222,114 +225,58 @@ export class TagTools extends BaseTool {
     }
   }
 
-  /**
-   * Get tool registrations for the registry
-   */
-  getToolRegistrations(): ToolRegistration[] {
+  getToolDefinitions(): ToolDefinition[] {
     return [
       {
         name: 'tags_list',
+        title: 'List tags',
+        description: 'List all tags in Things3 with hierarchy information',
+        inputSchema: z.object({}),
+        annotations: READ_ONLY,
         handler: this.listTags.bind(this),
-        toolDefinition: {
-          name: 'tags_list',
-          description: 'List all tags in Things3 with hierarchy information',
-          inputSchema: {
-            type: 'object',
-            properties: {}
-          }
-        }
       },
       {
         name: 'tags_create',
+        title: 'Create tag',
+        description: 'Create a new tag in Things3',
+        inputSchema: z.object({
+          name: z.string().min(1).describe('The tag name'),
+          parentTagId: z.string().optional().describe('Parent tag ID for a nested tag'),
+        }),
+        annotations: CREATES,
         handler: this.createTag.bind(this),
-        toolDefinition: {
-          name: 'tags_create',
-          description: 'Create a new tag in Things3',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              name: { 
-                type: 'string',
-                description: 'The tag name'
-              },
-              parentTagId: { 
-                type: 'string',
-                description: 'Optional parent tag ID for creating nested tags'
-              }
-            },
-            required: ['name']
-          }
-        }
       },
       {
         name: 'tags_add',
+        title: 'Add tags',
+        description: 'Add tags to to-dos or projects (missing tags are created)',
+        inputSchema: z.object({
+          itemIds: z.array(z.string().min(1)).min(1).describe('IDs of to-dos or projects'),
+          tags: z.array(z.string().min(1)).min(1).describe('Tag names to add'),
+        }),
+        annotations: ADDITIVE,
         handler: this.addTags.bind(this),
-        toolDefinition: {
-          name: 'tags_add',
-          description: 'Add tags to TODOs or projects',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              itemIds: { 
-                type: 'array',
-                items: { type: 'string' },
-                description: 'IDs of TODOs or projects to add tags to'
-              },
-              tags: { 
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Tag names to add'
-              }
-            },
-            required: ['itemIds', 'tags']
-          }
-        }
       },
       {
         name: 'tags_remove',
+        title: 'Remove tags',
+        description: 'Remove tags from to-dos or projects',
+        inputSchema: z.object({
+          itemIds: z.array(z.string().min(1)).min(1).describe('IDs of to-dos or projects'),
+          tags: z.array(z.string().min(1)).min(1).describe('Tag names to remove'),
+        }),
+        annotations: DESTRUCTIVE,
         handler: this.removeTags.bind(this),
-        toolDefinition: {
-          name: 'tags_remove',
-          description: 'Remove tags from TODOs or projects',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              itemIds: { 
-                type: 'array',
-                items: { type: 'string' },
-                description: 'IDs of TODOs or projects to remove tags from'
-              },
-              tags: { 
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Tag names to remove'
-              }
-            },
-            required: ['itemIds', 'tags']
-          }
-        }
       },
       {
         name: 'tags_delete',
+        title: 'Delete tags',
+        description: 'Delete tags completely from Things3 (they are removed from every item)',
+        inputSchema: z.object({ names: idList('Tag name(s) to delete') }),
+        annotations: DESTRUCTIVE,
         handler: this.deleteTags.bind(this),
-        toolDefinition: {
-          name: 'tags_delete',
-          description: 'Delete tags completely from Things3',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              names: {
-                oneOf: [
-                  { type: 'string' },
-                  { type: 'array', items: { type: 'string' } }
-                ],
-                description: 'Tag name(s) to delete completely from Things3'
-              }
-            },
-            required: ['names']
-          }
-        }
-      }
+      },
     ];
   }
+
 }

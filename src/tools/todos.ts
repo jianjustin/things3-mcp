@@ -1,7 +1,10 @@
 // ABOUTME: Implementation of TODO-related tools for Things3 MCP server
 // ABOUTME: Provides CRUD operations for TODOs with filtering and search
 
-import { BaseTool, ToolRegistration } from '../base/tool-base.js';
+import * as z from 'zod';
+import { BaseTool, ToolDefinition } from '../base/tool-base.js';
+import { READ_ONLY, CREATES, ADDITIVE, DESTRUCTIVE } from '../base/annotations.js';
+import { idList, WHEN_FORMATS, DEADLINE_FORMATS } from '../base/schemas.js';
 import {
   TodosListParams,
   TodosListResult,
@@ -387,248 +390,110 @@ export class TodosTools extends BaseTool {
     }
   }
 
-  /**
-   * Get tool registrations for the registry
-   */
-  getToolRegistrations(): ToolRegistration[] {
+  getToolDefinitions(): ToolDefinition[] {
     return [
       {
         name: 'todos_list',
+        title: 'List to-dos',
+        description: 'List to-dos, optionally filtered by built-in list, status, project, area, tags or text',
+        inputSchema: z.object({
+          filter: z
+            .enum(['inbox', 'today', 'upcoming', 'anytime', 'someday', 'logbook'])
+            .optional()
+            .describe('Built-in Things3 list to read'),
+          status: z.enum(['open', 'completed', 'cancelled']).optional().describe('Filter by status'),
+          projectId: z.string().optional().describe('Only to-dos of this project (can be combined with filter)'),
+          areaId: z
+            .string()
+            .optional()
+            .describe('Only to-dos of this area (can be combined with filter, not with projectId)'),
+          tags: z.array(z.string()).optional().describe('Only to-dos that have all of these tags'),
+          searchText: z.string().optional().describe('Search in title and notes'),
+          limit: z.number().int().positive().optional().describe('Maximum number of results'),
+          offset: z.number().int().nonnegative().optional().describe('Number of results to skip'),
+        }),
+        annotations: READ_ONLY,
         handler: this.listTodos.bind(this),
-        toolDefinition: {
-          name: 'todos_list',
-          description: 'List TODOs with optional filtering',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            filter: {
-              type: 'string',
-              enum: ['inbox', 'today', 'upcoming', 'anytime', 'someday', 'logbook'],
-              description: 'Filter by TODO list',
-            },
-            status: {
-              type: 'string',
-              enum: ['open', 'completed', 'cancelled'],
-              description: 'Filter by status',
-            },
-            projectId: {
-              type: 'string',
-              description: 'Only to-dos of this project (can be combined with filter)',
-            },
-            areaId: {
-              type: 'string',
-              description: 'Only to-dos of this area (can be combined with filter, not with projectId)',
-            },
-            tags: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Only to-dos that have all of these tags',
-            },
-            searchText: {
-              type: 'string',
-              description: 'Search in title and notes',
-            },
-            limit: {
-              type: 'number',
-              description: 'Maximum number of results',
-            },
-            offset: {
-              type: 'number',
-              description: 'Number of results to skip',
-            },
-          },
-        },
-        }
       },
       {
         name: 'todos_get',
+        title: 'Get to-do',
+        description: 'Get full details of a specific to-do',
+        inputSchema: z.object({
+          id: z.string().min(1).describe('To-do ID'),
+        }),
+        annotations: READ_ONLY,
         handler: this.getTodo.bind(this),
-        toolDefinition: {
-          name: 'todos_get',
-        description: 'Get full details of a specific TODO',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string',
-              description: 'TODO ID',
-            },
-          },
-          required: ['id'],
-        },
-        },
       },
       {
         name: 'todos_create',
+        title: 'Create to-do',
+        description:
+          'Create a new to-do and return its id. Fields Things3 did not apply (e.g. unknown tags) are returned as warnings.',
+        inputSchema: z.object({
+          title: z.string().describe('To-do title'),
+          notes: z.string().optional().describe('To-do notes/description'),
+          whenDate: z.string().optional().describe(`When to work on it: ${WHEN_FORMATS}`),
+          deadline: z.string().optional().describe(`When it must be done: ${DEADLINE_FORMATS}`),
+          tags: z.array(z.string()).optional().describe('Tags to assign (must already exist)'),
+          projectId: z.string().optional().describe('Project to put it in'),
+          areaId: z.string().optional().describe('Area to put it in (not together with projectId)'),
+          heading: z.string().optional().describe('Title of a heading within the project to put it under'),
+          checklistItems: z.array(z.string()).optional().describe('Checklist item titles'),
+          reminder: z
+            .object({
+              dateTime: z.string().optional(),
+              minutesBeforeDeadline: z.number().optional(),
+              minutesBeforeWhen: z.number().optional(),
+            })
+            .optional()
+            .describe('Reminder settings (not supported yet; ignored)'),
+        }),
+        annotations: CREATES,
         handler: this.createTodo.bind(this),
-        toolDefinition: {
-          name: 'todos_create',
-        description: 'Create a new TODO',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            title: {
-              type: 'string',
-              description: 'TODO title',
-            },
-            notes: {
-              type: 'string',
-              description: 'TODO notes/description',
-            },
-            whenDate: {
-              type: 'string',
-              description: 'When to work on it: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday',
-            },
-            deadline: {
-              type: 'string',
-              description: 'When it must be done: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow',
-            },
-            tags: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Tags to assign',
-            },
-            projectId: {
-              type: 'string',
-              description: 'Project to assign to',
-            },
-            areaId: {
-              type: 'string',
-              description: 'Area to assign to',
-            },
-            heading: {
-              type: 'string',
-              description: 'Title of heading within project to add to',
-            },
-            checklistItems: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Checklist item titles',
-            },
-            reminder: {
-              type: 'object',
-              properties: {
-                dateTime: { type: 'string' },
-                minutesBeforeDeadline: { type: 'number' },
-                minutesBeforeWhen: { type: 'number' },
-              },
-              description: 'Reminder settings',
-            },
-          },
-          required: ['title'],
-        },
-        },
       },
       {
         name: 'todos_update',
+        title: 'Update to-do',
+        description: 'Change fields of an existing to-do; fails unless Things3 really applied the change',
+        inputSchema: z.object({
+          id: z.string().min(1).describe('To-do ID'),
+          title: z.string().optional().describe('New title'),
+          notes: z.string().nullable().optional().describe('New notes (null to clear)'),
+          whenDate: z.string().nullable().optional().describe(`New when date: ${WHEN_FORMATS}. null to clear`),
+          deadline: z.string().nullable().optional().describe(`New deadline: ${DEADLINE_FORMATS}. null to clear`),
+          tags: z.array(z.string()).optional().describe('Replace all tags (tags must already exist)'),
+          projectId: z.string().nullable().optional().describe('Move to this project (null to move to the Inbox)'),
+          areaId: z.string().nullable().optional().describe('Move to this area (null to move to the Inbox)'),
+        }),
+        annotations: DESTRUCTIVE,
         handler: this.updateTodo.bind(this),
-        toolDefinition: {
-          name: 'todos_update',
-        description: 'Update an existing TODO',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string',
-              description: 'TODO ID',
-            },
-            title: {
-              type: 'string',
-              description: 'New title',
-            },
-            notes: {
-              type: ['string', 'null'],
-              description: 'New notes (null to clear)',
-            },
-            whenDate: {
-              type: ['string', 'null'],
-              description: 'New when date: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow/evening/anytime/someday. null to clear',
-            },
-            deadline: {
-              type: ['string', 'null'],
-              description: 'New deadline: YYYY-MM-DD (local calendar day), an ISO 8601 date-time, or today/tomorrow. null to clear',
-            },
-            tags: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Replace all tags',
-            },
-            projectId: {
-              type: ['string', 'null'],
-              description: 'New project (null to move to Inbox)',
-            },
-            areaId: {
-              type: ['string', 'null'],
-              description: 'New area (null to move to Inbox)',
-            },
-          },
-          required: ['id'],
-        },
-        },
       },
       {
         name: 'todos_complete',
+        title: 'Complete to-dos',
+        description: 'Mark to-dos as completed; the count only includes verified completions',
+        inputSchema: z.object({ ids: idList('To-do ID(s) to complete') }),
+        annotations: ADDITIVE,
         handler: this.completeTodos.bind(this),
-        toolDefinition: {
-          name: 'todos_complete',
-        description: 'Mark TODO(s) as complete',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            ids: {
-              oneOf: [
-                { type: 'string' },
-                { type: 'array', items: { type: 'string' } },
-              ],
-              description: 'TODO ID(s) to complete',
-            },
-          },
-          required: ['ids'],
-        },
-        },
       },
       {
         name: 'todos_uncomplete',
+        title: 'Reopen to-dos',
+        description: 'Mark completed to-dos as open again',
+        inputSchema: z.object({ ids: idList('To-do ID(s) to reopen') }),
+        annotations: ADDITIVE,
         handler: this.uncompleteTodos.bind(this),
-        toolDefinition: {
-          name: 'todos_uncomplete',
-        description: 'Mark TODO(s) as incomplete',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            ids: {
-              oneOf: [
-                { type: 'string' },
-                { type: 'array', items: { type: 'string' } },
-              ],
-              description: 'TODO ID(s) to uncomplete',
-            },
-          },
-          required: ['ids'],
-        },
-        },
       },
       {
         name: 'todos_delete',
+        title: 'Move to-dos to Trash',
+        description: 'Move to-dos to the Trash (recoverable in Things3; works for completed to-dos too)',
+        inputSchema: z.object({ ids: idList('To-do ID(s) to delete') }),
+        annotations: DESTRUCTIVE,
         handler: this.deleteTodos.bind(this),
-        toolDefinition: {
-          name: 'todos_delete',
-        description: 'Move TODO(s) to the Trash (recoverable in Things3; works for completed to-dos too)',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            ids: {
-              oneOf: [
-                { type: 'string' },
-                { type: 'array', items: { type: 'string' } },
-              ],
-              description: 'TODO ID(s) to delete',
-            },
-          },
-          required: ['ids'],
-        },
-        }
       },
     ];
   }
+
 }

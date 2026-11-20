@@ -1,17 +1,17 @@
 // ABOUTME: Integration tests for checklist functionality via URL schemes
 // ABOUTME: Tests the creation of TODOs with checklist items using Things3 URL schemes
 
-import { Things3Server } from '../../src/server.js';
+import { ToolSet } from './tool-set.js';
 import { TodosTools } from '../../src/tools/todos.js';
 import { TestResourceTracker } from './test-helpers.js';
 
 describe('Checklist Integration Tests', () => {
-  let server: Things3Server;
+  let server: ToolSet;
   let todosTools: TodosTools;
   let tracker: TestResourceTracker;
 
   beforeAll(() => {
-    server = new Things3Server();
+    server = new ToolSet();
     todosTools = server.todosTools;
     tracker = new TestResourceTracker(server);
   });
