@@ -1,12 +1,12 @@
 // ABOUTME: Things3 URL scheme handler for all write operations
 // ABOUTME: Replaces AppleScript for create, update, complete, and delete operations
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { createLogger } from './logger.js';
 import { toThingsDate, ThingsDateField } from './things-date.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Things3 URL scheme operations
@@ -39,6 +39,11 @@ interface Things3AttributesWithAuth {
   'auth-token'?: string;
 }
 
+/** Hide the auth token when logging URLs */
+function redactToken(url: string): string {
+  return url.replace(/(auth-token(?:%22%3A%22|=))[^&%]+/gi, '$1REDACTED');
+}
+
 export class URLSchemeHandler {
   private logger = createLogger('url-scheme');
 
@@ -54,14 +59,12 @@ export class URLSchemeHandler {
    */
   async execute(url: string): Promise<void> {
     try {
-      // Use 'open' command on macOS to handle URL schemes
-      const command = `open "${url}"`;
-      this.logger.debug(`Executing URL scheme: ${url.substring(0, 200)}...`);
-      
-      await execAsync(command);
-      
-      // Give Things3 more time to process the URL and create the TODO
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // `open -g` hands the URL to Things3 without bringing it to the foreground.
+      // execFile avoids a shell, so nothing in the URL can be interpreted by one.
+      this.logger.debug(`Executing URL scheme: ${redactToken(url).substring(0, 200)}...`);
+      await execFileAsync('open', ['-g', url]);
+      // No fixed sleep: URL commands are asynchronous and callers verify the
+      // result by reading Things3 back (see utils/write-guard.ts).
     } catch (error) {
       this.logger.error('Failed to execute URL scheme', error as Error);
       throw new Error(`URL scheme execution failed: ${(error as Error).message}`);

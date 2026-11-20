@@ -4,6 +4,7 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { AppleScriptBridge } from '../utils/applescript.js';
 import { createLogger } from '../utils/logger.js';
+import { WriteGuard } from '../utils/write-guard.js';
 
 /**
  * Tool handler function type
@@ -27,9 +28,19 @@ export abstract class BaseTool {
   protected bridge: AppleScriptBridge;
   protected logger: ReturnType<typeof createLogger>;
 
+  /** Options for write verification (tests shorten the timeouts) */
+  protected guardOptions: ConstructorParameters<typeof WriteGuard>[1] = {};
+
   constructor(protected toolName: string) {
     this.bridge = new AppleScriptBridge();
     this.logger = createLogger(toolName);
+  }
+
+  /**
+   * Validates inputs before, and verifies results after, URL-scheme writes
+   */
+  protected writeGuard(): WriteGuard {
+    return new WriteGuard(this.bridge, this.guardOptions);
   }
 
   /**

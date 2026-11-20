@@ -11,7 +11,9 @@ import {
   ProjectsCompleteParams,
   ProjectsDeleteParams,
   ProjectsDeleteResult,
-  Project
+  Project,
+  ErrorType,
+  Things3Error,
 } from '../types/index.js';
 import { 
   listProjects, 
@@ -19,6 +21,8 @@ import {
   deleteProjects
 } from '../templates/applescript-templates.js';
 import { urlSchemeHandler } from '../utils/url-scheme.js';
+import { toThingsDate } from '../utils/things-date.js';
+import { RequestedChanges, expectationFor, hintFor, throwIfNotApplied } from '../utils/write-guard.js';
 
 export class ProjectTools extends BaseTool {
   constructor() {
@@ -56,82 +60,127 @@ export class ProjectTools extends BaseTool {
   }
 
   /**
-   * Create a new project
+   * Create a new project and return its real id (see TodosTools.createTodo)
    */
   async createProject(params: ProjectsCreateParams): Promise<ProjectsCreateResult> {
+    if (!params.name || params.name.trim() === '') {
+      throw new Things3Error(ErrorType.INVALID_PARAMETER, 'name is required');
+    }
+
+    // Validate dates before anything is written (throws on invalid values)
+    const whenValue = params.whenDate ? toThingsDate(params.whenDate, 'when') : undefined;
+    const deadlineValue = params.deadline ? toThingsDate(params.deadline, 'deadline') : undefined;
+
+    const guard = this.writeGuard();
+    if (params.areaId) await guard.assertContainers({ areaId: params.areaId });
+
     // Ensure tags exist before creating the project
     if (params.tags && params.tags.length > 0) {
       await this.ensureTagsExist(params.tags);
     }
 
-    // Use URL scheme for creating projects
     const createParams: Parameters<typeof urlSchemeHandler.createProject>[0] = {
       title: params.name
     };
-    
     if (params.notes) createParams.notes = params.notes;
     if (params.whenDate) createParams.whenDate = params.whenDate;
     if (params.deadline) createParams.deadline = params.deadline;
     if (params.tags) createParams.tags = params.tags;
     if (params.areaId) createParams.areaId = params.areaId;
     if (params.headings) createParams.headings = params.headings;
-    
+
+    const before = await guard.findIdsByName('project', params.name);
     await urlSchemeHandler.createProject(createParams);
-    
-    // Since URL scheme doesn't return ID, we need to find the created project
-    // Wait a moment for Things3 to process the creation
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    try {
-      // List all projects and find the one we just created by title
-      const projectsResult = await this.listProjects({ includeCompleted: true });
-      const createdProject = projectsResult.projects.find(p => p.name === params.name);
-      
-      if (createdProject) {
-        return { id: createdProject.id, success: true };
-      } else {
-        // Fallback if we can't find the project
-        return { id: 'created', success: true };
-      }
-    } catch (error) {
-      // If something goes wrong, still return success since the project was likely created
-      return { id: 'created', success: true };
+    const { id, others } = await guard.waitForNewId('project', params.name, before);
+
+    const changes: RequestedChanges = { title: params.name };
+    if (params.notes) changes.notes = params.notes;
+    if (params.tags?.length) changes.tags = params.tags;
+    if (whenValue) changes.whenDate = whenValue;
+    if (deadlineValue) changes.deadline = deadlineValue;
+    if (params.areaId) changes.list = { areaId: params.areaId };
+    const verification = await guard.verify([{ id, expect: expectationFor(changes) }], { timeoutMs: 0 });
+
+    const warnings = verification.failed.flatMap((f) => f.problems);
+    if (warnings.length > 0) {
+      const hint = hintFor(verification);
+      if (hint) warnings.push(hint);
     }
+    if (others.length > 0) {
+      warnings.push(`Other new projects with the same name appeared at the same time: ${others.join(', ')}`);
+    }
+
+    const result: ProjectsCreateResult = { success: true, id };
+    if (warnings.length > 0) result.warnings = warnings;
+    return result;
   }
 
   /**
-   * Update an existing project
+   * Update an existing project; fails unless Things3 really applied the change
    */
   async updateProject(params: ProjectsUpdateParams): Promise<{ success: boolean }> {
+    const { id, ...fields } = params;
+    if (Object.values(fields).every((v) => v === undefined)) {
+      throw new Things3Error(ErrorType.INVALID_PARAMETER, 'Nothing to update: pass at least one field to change');
+    }
+
+    const guard = this.writeGuard();
+    guard.requireAuthToken();
+
+    // Validate dates before anything is written (throws on invalid values)
+    const changes: RequestedChanges = {};
+    if (params.name !== undefined) changes.title = params.name;
+    if (params.notes !== undefined) changes.notes = params.notes;
+    if (params.tags !== undefined) changes.tags = params.tags;
+    if (params.whenDate !== undefined) {
+      changes.whenDate = params.whenDate === null ? null : toThingsDate(params.whenDate, 'when');
+    }
+    if (params.deadline !== undefined) {
+      changes.deadline = params.deadline === null ? null : toThingsDate(params.deadline, 'deadline');
+    }
+    if (params.areaId !== undefined) {
+      changes.list = params.areaId ? { areaId: params.areaId } : 'inbox';
+    }
+
+    await guard.assertItems([id], 'project');
+    if (params.areaId) await guard.assertContainers({ areaId: params.areaId });
+
     // Ensure tags exist before updating the project
     if (params.tags && params.tags.length > 0) {
       await this.ensureTagsExist(params.tags);
     }
 
-    // Use URL scheme for updating projects
     const updateParams: Parameters<typeof urlSchemeHandler.updateProject>[1] = {};
-    
     if (params.name !== undefined) updateParams.title = params.name;
     if (params.notes !== undefined) updateParams.notes = params.notes;
     if (params.whenDate !== undefined) updateParams.whenDate = params.whenDate;
     if (params.deadline !== undefined) updateParams.deadline = params.deadline;
     if (params.tags !== undefined) updateParams.tags = params.tags;
     if (params.areaId !== undefined) updateParams.areaId = params.areaId;
-    
-    await urlSchemeHandler.updateProject(params.id, updateParams);
-    
-    
+
+    await urlSchemeHandler.updateProject(id, updateParams);
+
+    const verification = await guard.verify([{ id, expect: expectationFor(changes) }]);
+    throwIfNotApplied('projects_update', verification, hintFor(verification));
     return { success: true };
   }
 
   /**
-   * Complete a project
+   * Complete a project; fails unless Things3 really completed it
    */
   async completeProject(params: ProjectsCompleteParams): Promise<{ success: boolean }> {
-    // Use URL scheme for completing projects
+    const guard = this.writeGuard();
+    guard.requireAuthToken();
+    await guard.assertItems([params.id], 'project');
+
     await urlSchemeHandler.completeProject(params.id);
-    
-    
+
+    const verification = await guard.verify([{ id: params.id, expect: { status: 'completed' } }]);
+    throwIfNotApplied(
+      'projects_complete',
+      verification,
+      'Things3 may refuse to complete a project that still has open to-dos; complete, cancel or move them first.'
+    );
     return { success: true };
   }
 

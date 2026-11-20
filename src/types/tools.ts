@@ -80,6 +80,8 @@ export interface TodosCreateParams {
 export interface TodosCreateResult extends OperationResult {
   id?: string;
   correctionsMade?: string[];
+  /** Requested fields Things3 did not apply (the to-do itself was created) */
+  warnings?: string[];
 }
 
 /**
@@ -190,6 +192,8 @@ export interface ProjectsCreateParams {
  */
 export interface ProjectsCreateResult extends OperationResult {
   id?: string;
+  /** Requested fields Things3 did not apply (the project itself was created) */
+  warnings?: string[];
 }
 
 /**

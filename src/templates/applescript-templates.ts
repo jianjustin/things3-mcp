@@ -1173,3 +1173,119 @@ tell application "Things3"
   return version
 end tell`;
 }
+// ---------------------------------------------------------------------------
+// Read-back helpers used to verify URL-scheme writes (see utils/write-guard.ts)
+// ---------------------------------------------------------------------------
+
+const JSON_RETURN = `  set jsonData to current application's NSJSONSerialization's dataWithJSONObject:resultObject options:0 |error|:(missing value)
+  set jsonString to current application's NSString's alloc()'s initWithData:jsonData encoding:(current application's NSUTF8StringEncoding)
+  return jsonString as text`;
+
+function appleScriptList(values: string[]): string {
+  return `{${values.map((v) => `"${bridge.escapeString(v)}"`).join(', ')}}`;
+}
+
+/**
+ * Read the verifiable state of to-dos/projects by id.
+ * Dates are returned as local YYYY-MM-DD (built from date components, so the
+ * output does not depend on the system locale).
+ */
+export function readItemStates(ids: string[]): string {
+  return `-- things3-mcp:readItemStates
+use AppleScript version "2.4"
+use framework "Foundation"
+use scripting additions
+
+on pad2(n)
+  set s to (n as integer) as text
+  if (count of s) < 2 then set s to "0" & s
+  return s
+end pad2
+
+on isoDay(d)
+  return ((year of d) as text) & "-" & my pad2((month of d) as integer) & "-" & my pad2(day of d)
+end isoDay
+
+tell application "Things3"
+  set resultObject to current application's NSMutableArray's array()
+  repeat with rawId in ${appleScriptList(ids)}
+    set itemId to rawId as text
+    set dict to current application's NSMutableDictionary's dictionary()
+    dict's setObject:itemId forKey:"id"
+    set itemKind to ""
+    if exists project id itemId then
+      set t to project id itemId
+      set itemKind to "project"
+    else if exists to do id itemId then
+      set t to to do id itemId
+      set itemKind to "todo"
+    end if
+    if itemKind is "" then
+      dict's setObject:false forKey:"exists"
+    else
+      dict's setObject:true forKey:"exists"
+      dict's setObject:itemKind forKey:"kind"
+      set itemStatus to status of t
+      if itemStatus is open then
+        dict's setObject:"open" forKey:"status"
+      else if itemStatus is completed then
+        dict's setObject:"completed" forKey:"status"
+      else
+        dict's setObject:"canceled" forKey:"status"
+      end if
+      dict's setObject:(name of t) forKey:"title"
+      set n to notes of t
+      if n is missing value then set n to ""
+      dict's setObject:n forKey:"notes"
+      dict's setObject:(current application's NSArray's arrayWithArray:(name of tags of t)) forKey:"tags"
+      if itemKind is "todo" then
+        if project of t is not missing value then dict's setObject:(id of project of t) forKey:"projectId"
+      end if
+      if area of t is not missing value then dict's setObject:(id of area of t) forKey:"areaId"
+      set dd to due date of t
+      if dd is not missing value then dict's setObject:(my isoDay(dd)) forKey:"deadline"
+      set ad to activation date of t
+      if ad is not missing value then dict's setObject:(my isoDay(ad)) forKey:"activationDate"
+    end if
+    resultObject's addObject:dict
+  end repeat
+${JSON_RETURN}
+end tell`;
+}
+
+/**
+ * Ids of open to-dos (or projects) with exactly this name.
+ */
+export function findIdsByName(kind: 'todo' | 'project', name: string): string {
+  return `-- things3-mcp:findIdsByName
+use AppleScript version "2.4"
+use framework "Foundation"
+use scripting additions
+
+tell application "Things3"
+  set foundIds to id of every ${kind === 'project' ? 'project' : 'to do'} whose name is "${bridge.escapeString(name)}"
+  set resultObject to current application's NSArray's arrayWithArray:foundIds
+${JSON_RETURN}
+end tell`;
+}
+
+/**
+ * Check that a project and/or area exist.
+ */
+export function checkContainers(projectId?: string, areaId?: string): string {
+  const projectCheck = projectId
+    ? `exists project id "${bridge.escapeString(projectId)}"`
+    : 'true';
+  const areaCheck = areaId ? `exists area id "${bridge.escapeString(areaId)}"` : 'true';
+  return `-- things3-mcp:checkContainers
+use AppleScript version "2.4"
+use framework "Foundation"
+use scripting additions
+
+tell application "Things3"
+  set resultObject to current application's NSMutableDictionary's dictionary()
+  resultObject's setObject:(${projectCheck}) forKey:"project"
+  resultObject's setObject:(${areaCheck}) forKey:"area"
+${JSON_RETURN}
+end tell`;
+}
