@@ -428,8 +428,8 @@ npm run dev
 # Run tests
 npm test
 
-# Run integration tests (requires Things3)
-npm run test:integration
+# Run integration tests (requires Things3; WRITES to your real Things3 data)
+THINGS3_INTEGRATION=1 npm run test:integration
 
 # Lint code
 npm run lint

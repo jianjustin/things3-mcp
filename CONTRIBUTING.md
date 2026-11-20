@@ -27,7 +27,8 @@ npm run dev
 # Run tests
 npm test
 npm run test:unit
-npm run test:integration
+# Integration tests write to your real Things3 database; opt in explicitly
+THINGS3_INTEGRATION=1 npm run test:integration
 ```
 
 ## Code Style

@@ -7,6 +7,15 @@ import { resolve } from 'path';
 // Load environment variables from .env file
 config({ path: resolve(process.cwd(), '.env') });
 
+// These tests create, modify and delete items (including areas and tags matched
+// by name) in the real Things3 database. Refuse to run unless explicitly enabled.
+if (process.env['THINGS3_INTEGRATION'] !== '1') {
+  throw new Error(
+    'Integration tests write to your real Things3 database. ' +
+      'Set THINGS3_INTEGRATION=1 to run them (ideally against a test Things3 setup).',
+  );
+}
+
 // Set NODE_ENV to integration-test to disable logging during integration tests
 process.env['NODE_ENV'] = 'integration-test';
 

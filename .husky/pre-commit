@@ -7,10 +7,6 @@ npm run lint
 # Run unit tests
 npm run test:unit
 
-# Run integration tests if Things3 is available
-if command -v osascript >/dev/null 2>&1; then
-  echo "🚨 Running integration tests with Things3..."
-  npm run test:integration
-else
-  echo "❌ Skipping integration tests (macOS/AppleScript not available)"
-fi
+# Integration tests are NOT run here: they create, modify and delete data in
+# the real Things3 database of whoever is committing. Run them manually against
+# a dedicated/test Things3 setup with THINGS3_INTEGRATION=1 npm run test:integration
