@@ -206,6 +206,24 @@ export class WriteGuard {
     }
   }
 
+  /**
+   * Move items to the Trash (after assertItems). Throws if Things3 refused any.
+   */
+  async trash(kind: ItemKind, ids: string[]): Promise<number> {
+    const response = await this.bridge.execute(templates.trashItems(kind, ids));
+    const result = JSON.parse(response) as { trashed: string[]; failed: Array<{ id: string; error: string }> };
+    if (result.failed.length > 0) {
+      const details = result.failed.map((f) => `${f.id}: ${f.error}`).join('\n');
+      throw new Things3Error(
+        ErrorType.APPLESCRIPT_ERROR,
+        `Things3 moved ${result.trashed.length} of ${ids.length} to the Trash.` +
+          (result.trashed.length ? ` Moved: ${result.trashed.join(', ')}.` : '') +
+          `\nNot moved:\n${details}`,
+      );
+    }
+    return result.trashed.length;
+  }
+
   async findIdsByName(kind: ItemKind, name: string): Promise<string[]> {
     const response = await this.bridge.execute(templates.findIdsByName(kind, name));
     return JSON.parse(response) as string[];

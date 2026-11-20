@@ -83,7 +83,7 @@ npm run build
 
 ### Environment Variables
 
-For update operations (modify, complete, delete), you need to set your Things3 authorization token:
+For update operations (modify, complete, move, change dates), you need to set your Things3 authorization token. Without it Things3 ignores these commands, so the server refuses them with an explicit error:
 
 ```bash
 export THINGS3_AUTH_TOKEN="your_auth_token_here"
@@ -229,7 +229,7 @@ Mark one or more TODOs as incomplete.
 - `ids`: Single ID or array of IDs (required)
 
 #### `todos_delete`
-Delete one or more TODOs permanently.
+Move one or more TODOs to the Trash (recoverable in Things3; works for completed TODOs too).
 
 **Parameters:**
 - `ids`: Single ID or array of IDs (required)
@@ -269,13 +269,13 @@ Update project properties (automatically creates tags if they don't exist).
 - All parameters from `projects_create` except `headings` (optional)
 
 #### `projects_complete`
-Mark a project as complete.
+Mark a project as complete. Things3 also marks all of the project's open TODOs as completed.
 
 **Parameters:**
 - `id`: Project identifier (required)
 
 #### `projects_delete`
-Delete projects completely from Things3.
+Move projects and their TODOs to the Trash (recoverable in Things3).
 
 **Parameters:**
 - `ids`: Single project ID or array of project IDs (required)

@@ -365,24 +365,16 @@ export class TodosTools extends BaseTool {
   }
 
   /**
-   * Delete one or more TODOs
+   * Move one or more TODOs to the Trash (works for completed to-dos too)
    */
   async deleteTodos(params: TodosDeleteParams): Promise<TodosDeleteResult> {
     try {
+      const ids = normalizeIds(params.ids, 'ids');
       await this.bridge.ensureThings3Running();
-      
-      const ids = Array.isArray(params.ids) ? params.ids : [params.ids];
-      
-      // Use AppleScript for actual deletion
-      const script = templates.deleteTodos(ids);
-      const result = await this.bridge.execute(script);
-      
-      const deletedCount = parseInt(result.trim()) || 0;
-      
-      return {
-        success: deletedCount > 0,
-        deletedCount: deletedCount,
-      };
+      const guard = this.writeGuard();
+      await guard.assertItems(ids, 'todo');
+      const deletedCount = await guard.trash('todo', ids);
+      return { success: true, deletedCount };
     } catch (error) {
       if (error instanceof Things3Error) {
         throw error;
@@ -621,7 +613,7 @@ export class TodosTools extends BaseTool {
         handler: this.deleteTodos.bind(this),
         toolDefinition: {
           name: 'todos_delete',
-        description: 'Delete TODO(s)',
+        description: 'Move TODO(s) to the Trash (recoverable in Things3; works for completed to-dos too)',
         inputSchema: {
           type: 'object',
           properties: {

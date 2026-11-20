@@ -18,11 +18,10 @@ import {
 import { 
   listProjects, 
   getProjectById,
-  deleteProjects
 } from '../templates/applescript-templates.js';
 import { urlSchemeHandler } from '../utils/url-scheme.js';
 import { toThingsDate } from '../utils/things-date.js';
-import { RequestedChanges, expectationFor, hintFor, throwIfNotApplied } from '../utils/write-guard.js';
+import { RequestedChanges, expectationFor, hintFor, normalizeIds, throwIfNotApplied } from '../utils/write-guard.js';
 
 export class ProjectTools extends BaseTool {
   constructor() {
@@ -176,38 +175,19 @@ export class ProjectTools extends BaseTool {
     await urlSchemeHandler.completeProject(params.id);
 
     const verification = await guard.verify([{ id: params.id, expect: { status: 'completed' } }]);
-    throwIfNotApplied(
-      'projects_complete',
-      verification,
-      'Things3 may refuse to complete a project that still has open to-dos; complete, cancel or move them first.'
-    );
+    throwIfNotApplied('projects_complete', verification);
     return { success: true };
   }
 
   /**
-   * Delete projects
+   * Move projects (with their to-dos) to the Trash
    */
   async deleteProjects(params: ProjectsDeleteParams): Promise<ProjectsDeleteResult> {
-    try {
-      const ids = Array.isArray(params.ids) ? params.ids : [params.ids];
-      
-      // Use AppleScript for actual deletion
-      const script = deleteProjects(ids);
-      const result = await this.bridge.execute(script);
-      
-      const deletedCount = parseInt(result.trim()) || 0;
-      
-      return {
-        success: deletedCount > 0,
-        deletedCount: deletedCount,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        deletedCount: 0,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      };
-    }
+    const ids = normalizeIds(params.ids, 'ids');
+    const guard = this.writeGuard();
+    await guard.assertItems(ids, 'project');
+    const deletedCount = await guard.trash('project', ids);
+    return { success: true, deletedCount };
   }
 
   /**
@@ -346,7 +326,7 @@ export class ProjectTools extends BaseTool {
         handler: this.completeProject.bind(this),
         toolDefinition: {
           name: 'projects_complete',
-          description: 'Mark a project as completed',
+          description: 'Mark a project as completed. Things3 also marks all of its open to-dos as completed.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -364,7 +344,7 @@ export class ProjectTools extends BaseTool {
         handler: this.deleteProjects.bind(this),
         toolDefinition: {
           name: 'projects_delete',
-          description: 'Delete projects in Things3 (moves to trash)',
+          description: 'Move projects and their to-dos to the Trash (recoverable in Things3)',
           inputSchema: {
             type: 'object',
             properties: {

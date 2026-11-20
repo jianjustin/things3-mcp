@@ -242,13 +242,15 @@ describe('write tools', () => {
       });
     });
 
-    it('projects_complete explains when Things3 did not complete the project', async () => {
+    it('projects_complete fails when Things3 did not complete the project', async () => {
       jest.spyOn(urlSchemeHandler, 'completeProject').mockResolvedValue();
       const tools = stub(new ProjectTools(), {
         readItemStates: () => [{ id: 'P', exists: true, kind: 'project', status: 'open' }],
       });
 
-      await expect(tools.completeProject({ id: 'P' })).rejects.toThrow(/open to-dos/);
+      await expect(tools.completeProject({ id: 'P' })).rejects.toThrow(
+        /applied 0 of 1[\s\S]*status: expected "completed", got "open"/,
+      );
     });
 
     it('projects_update verifies the new area', async () => {
@@ -266,6 +268,67 @@ describe('write tools', () => {
       await expect(tools.updateProject({ id: 'P', areaId: 'A' })).resolves.toEqual({
         success: true,
       });
+    });
+  });
+
+  describe('deletion (move to Trash)', () => {
+    it('todos_delete moves to the Trash and counts what Things3 accepted', async () => {
+      const scripts: string[] = [];
+      const tools = stub(new TodosTools(), {
+        readItemStates: () => [todo('1', { status: 'completed' }), todo('2')],
+        trashItems: (script) => {
+          scripts.push(script);
+          return { trashed: ['1', '2'], failed: [] };
+        },
+      });
+
+      await expect(tools.deleteTodos({ ids: ['1', '2'] })).resolves.toEqual({
+        success: true,
+        deletedCount: 2,
+      });
+      expect(scripts[0]).toContain('move to do id itemId to list id "TMTrashListSource"');
+    });
+
+    it('todos_delete rejects unknown ids and projects before deleting anything', async () => {
+      let trashCalled = false;
+      const tools = stub(new TodosTools(), {
+        readItemStates: () => [todo('1'), { id: 'P', exists: true, kind: 'project' }],
+        trashItems: () => {
+          trashCalled = true;
+          return { trashed: [], failed: [] };
+        },
+      });
+
+      await expect(tools.deleteTodos({ ids: ['1', 'P'] })).rejects.toThrow(/not a to-do: P/);
+      expect(trashCalled).toBe(false);
+    });
+
+    it('todos_delete reports items Things3 refused', async () => {
+      const tools = stub(new TodosTools(), {
+        readItemStates: () => [todo('1'), todo('2')],
+        trashItems: () => ({ trashed: ['1'], failed: [{ id: '2', error: 'nope (-1728)' }] }),
+      });
+
+      await expect(tools.deleteTodos({ ids: ['1', '2'] })).rejects.toThrow(
+        /moved 1 of 2 to the Trash[\s\S]*2: nope \(-1728\)/,
+      );
+    });
+
+    it('projects_delete moves projects to the Trash', async () => {
+      const scripts: string[] = [];
+      const tools = stub(new ProjectTools(), {
+        readItemStates: () => [{ id: 'P', exists: true, kind: 'project', status: 'completed' }],
+        trashItems: (script) => {
+          scripts.push(script);
+          return { trashed: ['P'], failed: [] };
+        },
+      });
+
+      await expect(tools.deleteProjects({ ids: 'P' })).resolves.toEqual({
+        success: true,
+        deletedCount: 1,
+      });
+      expect(scripts[0]).toContain('move project id itemId to list id "TMTrashListSource"');
     });
   });
 

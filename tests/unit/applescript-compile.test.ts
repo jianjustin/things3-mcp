@@ -18,6 +18,8 @@ const scripts: Record<string, string> = {
   findProjectIdsByName: templates.findIdsByName('project', 'Plan'),
   checkContainers: templates.checkContainers('P', 'A'),
   checkContainersEmpty: templates.checkContainers(),
+  trashTodos: templates.trashItems('todo', ['a', 'b"c']),
+  trashProjects: templates.trashItems('project', ['p']),
   listTodosAll: templates.listTodos(),
   listTodosFiltered: templates.listTodos('today', 'open', 'x', { projectId: 'P', includeTags: true }),
   listTodosArea: templates.listTodos(undefined, 'completed', undefined, { areaId: 'A' }),

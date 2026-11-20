@@ -357,28 +357,6 @@ export function uncompleteTodos(ids: string[]): string {
 }
 
 /**
- * Generate AppleScript to delete TODOs
- */
-export function deleteTodos(ids: string[]): string {
-  let script = 'tell application "Things3"\n';
-  script += '  set deletedCount to 0\n';
-  
-  for (const id of ids) {
-    const escapedId = bridge.escapeString(id);
-    script += '  try\n';
-    script += `    set t to to do id "${escapedId}"\n`;
-    script += '    delete t\n';
-    script += '    set deletedCount to deletedCount + 1\n';
-    script += '  end try\n';
-  }
-  
-  script += '  return deletedCount\n';
-  script += 'end tell';
-  
-  return script;
-}
-
-/**
  * Generate AppleScript to list projects
  */
 export function listProjects(areaId?: string, includeCompleted?: boolean): string {
@@ -1143,28 +1121,6 @@ export function deleteAreas(ids: string[]): string {
 }
 
 /**
- * Generate AppleScript to delete projects
- */
-export function deleteProjects(ids: string[]): string {
-  let script = 'tell application "Things3"\n';
-  script += '  set deletedCount to 0\n';
-  
-  for (const id of ids) {
-    const escapedId = bridge.escapeString(id);
-    script += '  try\n';
-    script += `    set p to project id "${escapedId}"\n`;
-    script += '    delete p\n';
-    script += '    set deletedCount to deletedCount + 1\n';
-    script += '  end try\n';
-  }
-  
-  script += '  return deletedCount\n';
-  script += 'end tell';
-  
-  return script;
-}
-
-/**
  * Generate AppleScript to get Things3 version
  */
 export function getThings3Version(): string {
@@ -1286,6 +1242,40 @@ tell application "Things3"
   set resultObject to current application's NSMutableDictionary's dictionary()
   resultObject's setObject:(${projectCheck}) forKey:"project"
   resultObject's setObject:(${areaCheck}) forKey:"area"
+${JSON_RETURN}
+end tell`;
+}
+
+/**
+ * Move to-dos or projects to the Trash. `delete` fails for completed items
+ * (error -1728), while moving to the Trash list works for any status.
+ * Returns {"trashed": [ids], "failed": [{"id", "error"}]}.
+ */
+export function trashItems(kind: 'todo' | 'project', ids: string[]): string {
+  const specifier = kind === 'project' ? 'project id itemId' : 'to do id itemId';
+  return `-- things3-mcp:trashItems
+use AppleScript version "2.4"
+use framework "Foundation"
+use scripting additions
+
+tell application "Things3"
+  set trashed to current application's NSMutableArray's array()
+  set failed to current application's NSMutableArray's array()
+  repeat with rawId in ${appleScriptList(ids)}
+    set itemId to rawId as text
+    try
+      move ${specifier} to list id "TMTrashListSource"
+      trashed's addObject:itemId
+    on error errMsg number errNum
+      set failure to current application's NSMutableDictionary's dictionary()
+      failure's setObject:itemId forKey:"id"
+      failure's setObject:(errMsg & " (" & errNum & ")") forKey:"error"
+      failed's addObject:failure
+    end try
+  end repeat
+  set resultObject to current application's NSMutableDictionary's dictionary()
+  resultObject's setObject:trashed forKey:"trashed"
+  resultObject's setObject:failed forKey:"failed"
 ${JSON_RETURN}
 end tell`;
 }
