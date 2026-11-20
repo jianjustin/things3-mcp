@@ -6,81 +6,94 @@ import { TodoFilter, TodoStatus } from '../types/index.js';
 
 const bridge = new AppleScriptBridge();
 
+export interface ListTodosOptions {
+  /** Only to dos of this project */
+  projectId?: string;
+  /** Only to dos of this area */
+  areaId?: string;
+  /** Include tag names in each result (needed for tag filtering) */
+  includeTags?: boolean;
+}
+
+const BUILT_IN_LISTS: Record<TodoFilter, string> = {
+  inbox: 'Inbox',
+  today: 'Today',
+  upcoming: 'Upcoming',
+  anytime: 'Anytime',
+  someday: 'Someday',
+  logbook: 'Logbook',
+};
+
 /**
  * Generate AppleScript to list TODOs with filtering
  */
 export function listTodos(
   filter?: TodoFilter,
   status?: TodoStatus,
-  searchText?: string
+  searchText?: string,
+  options: ListTodosOptions = {}
 ): string {
   let script = `use AppleScript version "2.4"
 use framework "Foundation"
 use scripting additions
 
 tell application "Things3"\n`;
-  
-  // Determine which list to query
-  let listName = 'to dos';
-  if (filter) {
-    switch (filter) {
-      case 'inbox':
-        listName = 'to dos of list "Inbox"';
-        break;
-      case 'today':
-        listName = 'to dos of list "Today"';
-        break;
-      case 'upcoming':
-        listName = 'to dos of list "Upcoming"';
-        break;
-      case 'anytime':
-        listName = 'to dos of list "Anytime"';
-        break;
-      case 'someday':
-        listName = 'to dos of list "Someday"';
-        break;
-      case 'logbook':
-        listName = 'to dos of list "Logbook"';
-        break;
-    }
+
+  const builtInList = filter ? `to dos of list "${BUILT_IN_LISTS[filter]}"` : undefined;
+
+  // Source: a project or area if given, otherwise the built-in list (or everything)
+  let source = builtInList ?? 'to dos';
+  let intersectWithBuiltIn = false;
+  if (options.projectId) {
+    source = `to dos of project id "${bridge.escapeString(options.projectId)}"`;
+    intersectWithBuiltIn = builtInList !== undefined;
+  } else if (options.areaId) {
+    source = `to dos of area id "${bridge.escapeString(options.areaId)}"`;
+    intersectWithBuiltIn = builtInList !== undefined;
   }
-  
-  script += `  set todoList to ${listName}\n`;
+
+  script += `  set todoList to ${source}\n`;
+  if (intersectWithBuiltIn) {
+    script += `  set allowedIds to id of ${builtInList}\n`;
+  }
   script += '  set resultArray to current application\'s NSMutableArray\'s array()\n';
   script += '  repeat with t in todoList\n';
-  
-  // Apply status filter
-  if (status) {
-    if (status === 'open') {
-      script += '    if status of t is open then\n';
-    } else if (status === 'completed') {
-      script += '    if status of t is completed then\n';
-    } else if (status === 'cancelled') {
-      script += '    if status of t is canceled then\n';
-    }
+
+  // Open conditionals (closed in reverse order below)
+  const conditions: string[] = [];
+  if (intersectWithBuiltIn) {
+    conditions.push('if allowedIds contains (id of t) then');
   }
-  
-  // Apply search text filter
+  if (status === 'open') {
+    conditions.push('if status of t is open then');
+  } else if (status === 'completed') {
+    conditions.push('if status of t is completed then');
+  } else if (status === 'cancelled') {
+    conditions.push('if status of t is canceled then');
+  }
   if (searchText) {
     const escaped = bridge.escapeString(searchText);
-    script += `    if (name of t contains "${escaped}" or notes of t contains "${escaped}") then\n`;
+    conditions.push(`if (name of t contains "${escaped}" or notes of t contains "${escaped}") then`);
   }
-  
+  for (const condition of conditions) {
+    script += `    ${condition}\n`;
+  }
+
   // Build result using NSMutableDictionary for proper JSON serialization
   script += '      set todoDict to current application\'s NSMutableDictionary\'s dictionary()\n';
   script += '      todoDict\'s setObject:(id of t) forKey:"id"\n';
   script += '      todoDict\'s setObject:(name of t) forKey:"title"\n';
   script += '      todoDict\'s setObject:(status of t is completed) forKey:"completed"\n';
+  if (options.includeTags) {
+    script += '      set tagNames to name of tags of t\n';
+    script += '      todoDict\'s setObject:(current application\'s NSArray\'s arrayWithArray:tagNames) forKey:"tags"\n';
+  }
   script += '      resultArray\'s addObject:todoDict\n';
-  
-  // Close conditionals
-  if (searchText) {
+
+  for (let i = 0; i < conditions.length; i++) {
     script += '    end if\n';
   }
-  if (status) {
-    script += '    end if\n';
-  }
-  
+
   script += '  end repeat\n';
   script += '  \n';
   script += '  -- Convert to JSON\n';
@@ -92,7 +105,7 @@ tell application "Things3"\n`;
   script += '    return jsonString as text\n';
   script += '  end if\n';
   script += 'end tell';
-  
+
   return script;
 }
 

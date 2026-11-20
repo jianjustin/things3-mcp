@@ -43,6 +43,8 @@ export interface TodosListResult {
   title: string;
   whenDate?: string;
   completed: boolean;
+  /** Present when the tags filter is used */
+  tags?: string[];
 }
 
 /**

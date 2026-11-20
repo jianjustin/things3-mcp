@@ -38,35 +38,34 @@ export class TodosTools extends BaseTool {
    */
   async listTodos(params: TodosListParams): Promise<TodosListResult[]> {
     try {
+      if (params.projectId && params.areaId) {
+        throw new Things3Error(
+          ErrorType.INVALID_PARAMETER,
+          'Pass either projectId or areaId, not both'
+        );
+      }
+
+      const wantTags = params.tags && params.tags.length > 0 ? params.tags : undefined;
+
       // Ensure Things3 is running
       await this.bridge.ensureThings3Running();
 
-      // Generate and execute AppleScript
-      const script = templates.listTodos(params.filter, params.status, params.searchText);
+      // Generate and execute AppleScript (project/area filters are applied in the script)
+      const listOptions: templates.ListTodosOptions = {};
+      if (params.projectId) listOptions.projectId = params.projectId;
+      if (params.areaId) listOptions.areaId = params.areaId;
+      if (wantTags) listOptions.includeTags = true;
+      const script = templates.listTodos(params.filter, params.status, params.searchText, listOptions);
       const response = await this.bridge.execute(script);
-      
+
       // Parse response
       const todos = JSON.parse(response) as TodosListResult[];
-      
-      // Apply additional filtering if needed
-      let filtered = todos;
-      
-      // Filter by project
-      if (params.projectId) {
-        // We'll need to fetch full details to filter by project
-        // For now, this is a limitation of the list operation
-      }
-      
-      // Filter by area
-      if (params.areaId) {
-        // Same limitation as project filtering
-      }
-      
-      // Filter by tags
-      if (params.tags && params.tags.length > 0) {
-        // We need full details to filter by tags
-      }
-      
+
+      // Filter by tags: keep to dos that carry every requested tag
+      let filtered = wantTags
+        ? todos.filter((todo) => wantTags.every((tag) => (todo.tags ?? []).includes(tag)))
+        : todos;
+
       // Apply pagination
       if (params.offset !== undefined || params.limit !== undefined) {
         const offset = params.offset || 0;
@@ -423,16 +422,16 @@ export class TodosTools extends BaseTool {
             },
             projectId: {
               type: 'string',
-              description: 'Filter by project ID',
+              description: 'Only to-dos of this project (can be combined with filter)',
             },
             areaId: {
               type: 'string',
-              description: 'Filter by area ID',
+              description: 'Only to-dos of this area (can be combined with filter, not with projectId)',
             },
             tags: {
               type: 'array',
               items: { type: 'string' },
-              description: 'Filter by tags (AND operation)',
+              description: 'Only to-dos that have all of these tags',
             },
             searchText: {
               type: 'string',
