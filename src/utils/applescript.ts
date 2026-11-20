@@ -5,6 +5,19 @@ import { spawn } from 'child_process';
 import { ErrorType, Things3Error } from '../types/index.js';
 
 /**
+ * Build a readable error message from osascript's stderr.
+ * osascript prefixes errors with the failing source range, e.g.
+ * "34:40: execution error: <message> (-1728)"; keep only the message.
+ */
+export function describeOsascriptFailure(stderr: string, code: number | null): string {
+  const message = stderr
+    .trim()
+    .replace(/^\d+:\d+:\s*/, '')
+    .replace(/^execution error:\s*/, '');
+  return message ? `AppleScript error: ${message}` : `AppleScript execution failed with code ${code}`;
+}
+
+/**
  * Bridge class for executing AppleScript commands
  */
 export class AppleScriptBridge {
@@ -67,7 +80,7 @@ export class AppleScriptBridge {
           } else {
             reject(new Things3Error(
               ErrorType.APPLESCRIPT_ERROR,
-              `AppleScript execution failed with code ${code}`,
+              describeOsascriptFailure(stderr, code),
               { stderr, stdout }
             ));
           }
